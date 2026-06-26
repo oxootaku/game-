@@ -340,13 +340,9 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--t
 </div>
 
 <script>
-/* ══════════════════════════════════════════════════════════
-   ⚙️  CONFIG — เปลี่ยนแค่บรรทัดนี้บรรทัดเดียว
-   ══════════════════════════════════════════════════════════ */
 const SCRIPT_URL   = 'https://script.google.com/macros/s/AKfycbwW13vxM_vhKpqz7oUdvb1Vksro9RUsaNGH0dl-c_zxIMhUk5uzAxyECu4Nrc0WFRfZ/exec';
-const COOLDOWN_MIN = 50; // ต้องตรงกับ COOLDOWN_MINUTES ใน Apps Script
+const COOLDOWN_MIN = 50;
 
-/* ── ทีมทั้งหมด (ต้องตรงกับ TEAM_MAP ใน Apps Script) ── */
 const TEAMS = {
   GREEN:  { emoji:'🟢', nameTH:'เขียว',   hex:'#2e7d32' },
   BLUE:   { emoji:'🔵', nameTH:'น้ำเงิน', hex:'#1565c0' },
@@ -359,19 +355,13 @@ const TEAMS = {
 const GAME_LABEL = { tap:'คะแนนแตะเป้า', jump:'ครั้งที่กระโดด', speed:'ครั้งที่ตบมือ', dodge:'วินาทีที่รอด' };
 const GAME_TIME  = { tap:30, jump:30, speed:10, dodge:999 };
 
-/* ── STATE ── */
 let user=null, curGame=null, gScore=0, gTime=0;
 let gTimerID=null, cooldownTickID=null, cooldownUntil=0;
 let dgFallers=[], dgFallerID=null, dgRafID=null, dgLives=3, dgX=50, dgActive=false;
-
-/* ── POSE STATE ── */
 let pose=null, camStream=null, mpCam=null, poseReady=false, landmarks=null;
 let hipY=null, jumpBaseline=null, jumpState='down';
 let clapCooldown=false, wristPrevDist=null, tapTargets=[];
 
-/* ══════════════════════════════════════════════════════════
-   API HELPER
-   ══════════════════════════════════════════════════════════ */
 async function api(action, params={}) {
   const q = new URLSearchParams({ action, ...params });
   try {
@@ -382,9 +372,6 @@ async function api(action, params={}) {
   }
 }
 
-/* ══════════════════════════════════════════════════════════
-   INIT
-   ══════════════════════════════════════════════════════════ */
 window.onload = () => {
   const s = localStorage.getItem('sportUser');
   if (s) { user = JSON.parse(s); renderMenu(); show('menuScreen'); }
@@ -393,9 +380,6 @@ window.onload = () => {
   document.getElementById('sid').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 };
 
-/* ══════════════════════════════════════════════════════════
-   LOGIN / LOGOUT
-   ══════════════════════════════════════════════════════════ */
 async function doLogin() {
   const id = document.getElementById('sid').value.trim();
   if (!id) { setErr('กรุณากรอกเลขประจำตัว'); return; }
@@ -403,8 +387,6 @@ async function doLogin() {
   const res = await api('login', { studentId: id });
   hideLoader();
   if (res.error) { setErr(res.error); return; }
-
-  /* Apps Script ส่ง cooldownLeft (นาที) → แปลงเป็นวินาทีเก็บไว้ใน user */
   user = {
     studentId:          res.studentId,
     name:               res.name,
@@ -426,9 +408,6 @@ function logout() {
 
 function setErr(m) { document.getElementById('loginErr').textContent = m; }
 
-/* ══════════════════════════════════════════════════════════
-   MENU
-   ══════════════════════════════════════════════════════════ */
 function renderMenu() {
   const t   = (user.team || 'GREEN').toUpperCase();
   const cfg = TEAMS[t] || { emoji:'⚪', nameTH:t, hex:'#9e9e9e' };
@@ -467,16 +446,12 @@ async function refreshMenu() {
   const r = await api('getScore', { studentId: user.studentId });
   if (!r.error) {
     user.totalScore        = r.score || 0;
-    /* getScore ส่ง cooldownLeft (นาที) */
     user.cooldownRemainSec = (r.cooldownLeft || 0) * 60;
     localStorage.setItem('sportUser', JSON.stringify(user));
   }
   renderMenu(); hideLoader();
 }
 
-/* ══════════════════════════════════════════════════════════
-   TOTALS
-   ══════════════════════════════════════════════════════════ */
 function showTotals() { show('totalsScreen'); loadTotals(); }
 
 async function loadTotals() {
@@ -490,7 +465,6 @@ async function loadTotals() {
   const sorted   = [...res.data].sort((a,b) => b.score - a.score);
   const maxScore = Math.max(1, ...sorted.map(r => r.score));
   const medals   = ['🥇','🥈','🥉'];
-
   let html = `<div class="podium">` + sorted.map((row, i) => {
     const cfg = TEAMS[row.team] || { emoji:'⚪', nameTH:row.team };
     return `<div class="podium-item">
@@ -499,7 +473,6 @@ async function loadTotals() {
       <div style="font-size:11px;opacity:.55;font-weight:700">อันดับ ${i+1}</div>
     </div>`;
   }).join('') + `</div>`;
-
   html += sorted.map(row => {
     const cfg = TEAMS[row.team] || { emoji:'⚪', nameTH:row.team, hex:'#9e9e9e' };
     const pct = Math.round((row.score / maxScore) * 100);
@@ -515,9 +488,6 @@ async function loadTotals() {
   body.innerHTML = html;
 }
 
-/* ══════════════════════════════════════════════════════════
-   COOLDOWN UI
-   ══════════════════════════════════════════════════════════ */
 function applyCooldown(remSec) {
   stopCooldownTick();
   const grid   = document.getElementById('gameGrid');
@@ -551,9 +521,6 @@ function stopCooldownTick() {
   if (cooldownTickID) { clearInterval(cooldownTickID); cooldownTickID = null; }
 }
 
-/* ══════════════════════════════════════════════════════════
-   MEDIAPIPE POSE
-   ══════════════════════════════════════════════════════════ */
 function initPose() {
   return new Promise((resolve, reject) => {
     if (poseReady) { resolve(); return; }
@@ -566,7 +533,8 @@ function initPose() {
       minTrackingConfidence: 0.55,
     });
     pose.onResults(onPoseResults);
-    pose.initialize().then(() => { poseReady = true; resolve(); }).catch(reject);
+    const timeout = setTimeout(() => reject(new Error('pose timeout')), 30000);
+    pose.initialize().then(() => { clearTimeout(timeout); poseReady = true; resolve(); }).catch(e => { clearTimeout(timeout); reject(e); });
   });
 }
 
@@ -583,16 +551,31 @@ function onPoseResults(results) {
   processLandmarks(landmarks, canvas);
 }
 
+/* ── FIX: facingMode ideal + fallback ── */
 async function requestCam() {
   document.getElementById('camHelp').style.display = 'none';
   showLoader('กำลังเปิดกล้อง…');
   try {
-    camStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode:'user', width:{ ideal:640 }, height:{ ideal:480 } }, audio: false
-    });
+    /* ลองกล้องหน้าก่อน (ideal = ไม่บังคับ) */
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      });
+    } catch (e1) {
+      /* fallback: เปิดกล้องใดก็ได้ */
+      camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+
     const vid = document.getElementById('camVideo');
     vid.srcObject = camStream;
-    await vid.play();
+
+    /* รอให้ video พร้อมก่อน play */
+    await new Promise((res, rej) => {
+      vid.onloadedmetadata = () => vid.play().then(res).catch(rej);
+      setTimeout(() => rej(new Error('video metadata timeout')), 10000);
+    });
+
     showLoader('กำลังโหลด AI จับท่าทาง…');
     await initPose();
     mpCam = new Camera(vid, {
@@ -603,6 +586,7 @@ async function requestCam() {
     hideLoader();
     startCountdown();
   } catch(e) {
+    console.error('Camera error:', e);
     hideLoader();
     document.getElementById('camHelp').style.display = 'flex';
   }
@@ -615,9 +599,6 @@ function stopCam() {
   document.getElementById('camVideo').srcObject = null;
 }
 
-/* ══════════════════════════════════════════════════════════
-   POSE → GAME LOGIC
-   ══════════════════════════════════════════════════════════ */
 function processLandmarks(lm, canvas) {
   if (!curGame || !gTimerID) return;
   const W = canvas.width, H = canvas.height;
@@ -664,9 +645,6 @@ function processLandmarks(lm, canvas) {
   }
 }
 
-/* ══════════════════════════════════════════════════════════
-   GAME FLOW
-   ══════════════════════════════════════════════════════════ */
 function startGame(type) {
   if (cooldownUntil && Date.now() < cooldownUntil) return;
   curGame = type; gScore = 0; gTime = GAME_TIME[type];
@@ -736,9 +714,6 @@ function clearGameTimers() {
   dgActive = false;
 }
 
-/* ══════════════════════════════════════════════════════════
-   TAP GAME
-   ══════════════════════════════════════════════════════════ */
 const DOT_COLORS = ['#e53935','#1e88e5','#2e7d32','#f57f17','#7b1fa2','#0097a7'];
 function spawnTapDot() {
   const area = document.getElementById('gArea'); if (!area) return;
@@ -780,9 +755,6 @@ function checkTapHit(sx, sy, canvas) {
   });
 }
 
-/* ══════════════════════════════════════════════════════════
-   JUMP / CLAP / DODGE
-   ══════════════════════════════════════════════════════════ */
 function onJump() {
   gScore++; set('gScore', gScore);
   const el = document.getElementById('jumpBig');
@@ -828,9 +800,6 @@ function rafDodge() {
   dgRafID = requestAnimationFrame(rafDodge);
 }
 
-/* ══════════════════════════════════════════════════════════
-   END GAME / RESULT
-   ══════════════════════════════════════════════════════════ */
 function endGame() { clearGameTimers(); showResult(gScore); }
 
 async function showResult(score) {
@@ -853,15 +822,12 @@ async function showResult(score) {
 
   if (pts > 0 && user) {
     const r = await api('addScore', { studentId: user.studentId, points: pts, game: curGame });
-
     if (r.error === 'cooldown' || r.cooldownLeft > 0) {
-      /* cooldown — Apps Script ส่ง cooldownLeft (นาที) */
       document.getElementById('rAdded').textContent = `⏳ ต้องรออีก ${r.cooldownLeft || 0} นาที`;
       document.getElementById('rAdded').style.color = '#e53935';
       user.cooldownRemainSec = (r.cooldownLeft || 0) * 60;
     } else if (!r.error) {
       user.totalScore       = (user.totalScore || 0) + pts;
-      /* addScore ส่ง cooldownLeft (นาที) */
       user.cooldownRemainSec = (r.cooldownLeft || COOLDOWN_MIN) * 60;
     }
     localStorage.setItem('sportUser', JSON.stringify(user));
@@ -875,9 +841,6 @@ function playAgain() {
 
 function goMenu() { stopCam(); renderMenu(); show('menuScreen'); }
 
-/* ══════════════════════════════════════════════════════════
-   UTILS
-   ══════════════════════════════════════════════════════════ */
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
